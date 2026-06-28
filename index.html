@@ -8,9 +8,12 @@
   :root { --bg:#15171b; --panel:#1d2026; --line:#2c313a; --fg:#e6e8eb; --muted:#9aa3af; --accent:#3793ff; }
   * { box-sizing:border-box; }
   body { margin:0; font:15px/1.55 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
-  header { padding:10px 16px; border-bottom:1px solid var(--line); }
+  header { position:relative; padding:10px 16px; border-bottom:1px solid var(--line); }
   header h1 { margin:0 0 2px; font-size:16px; font-weight:600; }
   header p { margin:0; color:var(--muted); font-size:12px; }
+  .src { position:absolute; top:12px; right:16px; color:var(--muted); text-decoration:none;
+         font-size:12px; border:1px solid var(--line); padding:4px 9px; border-radius:7px; }
+  .src:hover { color:var(--fg); border-color:var(--accent); }
   nav { display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); }
   .tab { display:flex; align-items:center; gap:7px; padding:6px 11px; border:1px solid var(--line);
          border-radius:8px; background:var(--panel); color:var(--fg); cursor:pointer; font-size:13px;
@@ -49,6 +52,7 @@
 <header>
   <h1>DeltaChat Changelogs <span style="color:var(--muted);font-weight:400">· fan-made viewer</span></h1>
   <p>Pulled live from GitHub &amp; Codeberg. Unofficial.</p>
+  <a class="src" href="https://github.com/experintellia/deltachat-changelogs" target="_blank" rel="noopener">Source ↗</a>
 </header>
 <nav id="tabs"></nav>
 <div class="layout">
@@ -61,7 +65,7 @@
   <main><div id="content" class="status">Loading…</div></main>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="marked.min.js"></script>
 <script src="normalize.js"></script>
 <script>
 const DC = "https://github.com/deltachat.png";
