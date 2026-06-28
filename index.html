@@ -8,14 +8,16 @@
   :root { --bg:#15171b; --panel:#1d2026; --line:#2c313a; --fg:#e6e8eb; --muted:#9aa3af; --accent:#3793ff; }
   * { box-sizing:border-box; }
   body { margin:0; font:15px/1.55 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
-  header { position:relative; padding:10px 16px; border-bottom:1px solid var(--line); }
-  header h1 { margin:0 0 2px; font-size:16px; font-weight:600; }
-  header p { margin:0; color:var(--muted); font-size:12px; }
-  .actions { position:absolute; top:12px; right:16px; display:flex; gap:8px; }
-  .actions a { color:var(--muted); text-decoration:none; font-size:12px;
-               border:1px solid var(--line); padding:4px 9px; border-radius:7px; }
+  header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start;
+           gap:10px 16px; padding:10px 16px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0 0 3px; font-size:16px; font-weight:600; }
+  header h1 .tag { color:var(--muted); font-weight:400; }
+  header p { margin:0; max-width:820px; color:var(--muted); font-size:12.5px; line-height:1.45; }
+  .actions { display:flex; gap:8px; flex:none; }
+  .actions a { color:var(--muted); text-decoration:none; font-size:12px; cursor:pointer;
+               border:1px solid var(--line); padding:4px 9px; border-radius:7px; white-space:nowrap; }
   .actions a:hover { color:var(--fg); border-color:var(--accent); }
-  .actions a.donate { color:var(--accent); border-color:var(--accent); }
+  .actions a.viewtoggle { color:var(--accent); border-color:var(--accent); }
   nav { display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); }
   .tab { display:flex; align-items:center; gap:7px; padding:6px 11px; border:1px solid var(--line);
          border-radius:8px; background:var(--panel); color:var(--fg); cursor:pointer; font-size:13px;
@@ -62,10 +64,12 @@
 </head>
 <body>
 <header>
-  <h1>DeltaChat Changelogs <span style="color:var(--muted);font-weight:400">· fan-made viewer</span></h1>
-  <p>Pulled live from GitHub &amp; Codeberg. Unofficial.</p>
+  <div>
+    <h1 id="title"></h1>
+    <p id="subtitle"></p>
+  </div>
   <div class="actions">
-    <a class="donate" href="https://delta.chat/donate" target="_blank" rel="noopener">♥ Donate to Delta Chat</a>
+    <a id="viewtoggle" class="viewtoggle"></a>
     <a href="https://github.com/experintellia/deltachat-changelogs" target="_blank" rel="noopener"
        title="Source code of this viewer page (not the changelogs)">Page source ↗</a>
   </div>
@@ -143,6 +147,9 @@ const linkbarEl = document.getElementById("linkbar");
 const mainEl = document.querySelector("main");
 const searchEl = document.getElementById("search");
 const relBtn = document.getElementById("reltoggle");
+const titleEl = document.getElementById("title");
+const subEl = document.getElementById("subtitle");
+const toggleEl = document.getElementById("viewtoggle");
 
 // --- tabs as real links: native modifier-click (new tab/window) just works ---
 function go(id) { // normal in-page navigation to a tab
@@ -160,20 +167,36 @@ function mkTab(p) {
   a.onclick = go(p.id);
   return a;
 }
-// Build the tab bar for the current view; trailing button switches between views.
+// Build the tab bar for the current view. The view switch lives in the header.
 function renderTabs(view) {
   tabsEl.innerHTML = "";
   (view === "forks" ? FORKS : PROJECTS).forEach(p => {
     if (p.sep) { const s = document.createElement("span"); s.className = "sep"; tabsEl.appendChild(s); return; }
     tabsEl.appendChild(mkTab(p));
   });
-  tabsEl.appendChild(Object.assign(document.createElement("span"), { className: "sep" }));
-  const target = view === "forks" ? PROJECTS[0].id : FORKS[0].id;
-  const nav = document.createElement("a");
-  nav.className = "tab navbtn"; nav.href = "?p=" + target;
-  nav.textContent = view === "forks" ? "← Clients & community" : "Forks →";
-  nav.onclick = go(target);
-  tabsEl.appendChild(nav);
+}
+
+// Header title, intro text, and the view-switch button — all change with the view.
+const VIEW_META = {
+  main: {
+    title: 'DeltaChat Changelogs <span class="tag">· fan-made viewer</span>',
+    sub: 'Official Delta Chat &amp; chatmail clients, plus community clients that aim to follow the official ones fairly closely. Pulled live from GitHub &amp; Codeberg — unofficial.',
+    toggle: 'Forks →', target: () => FORKS[0].id,
+  },
+  forks: {
+    title: 'DeltaChat Forks <span class="tag">· fan-made viewer</span>',
+    sub: 'Forks add new features and make different decisions in some areas. Sometimes those features are later taken up by the official/upstream project. Pulled live — unofficial.',
+    toggle: '← Clients & community', target: () => PROJECTS[0].id,
+  },
+};
+function applyView(view) {
+  const m = VIEW_META[view], t = m.target();
+  titleEl.innerHTML = m.title;
+  subEl.innerHTML = m.sub;
+  toggleEl.textContent = m.toggle;
+  toggleEl.href = "?p=" + t;
+  toggleEl.onclick = go(t);
+  document.title = view === "forks" ? "DeltaChat Forks" : "DeltaChat Changelogs";
 }
 window.onpopstate = () => show(currentId());
 searchEl.oninput = renderSidebar;
@@ -226,7 +249,9 @@ function renderLinkbar(p) {
 async function show(id) {
   const p = byId(id);
   curId = id;
-  renderTabs(viewOf(id));
+  const view = viewOf(id);
+  applyView(view);
+  renderTabs(view);
   document.getElementById("tab-" + id).classList.add("active");
   renderLinkbar(p);
   searchEl.value = "";
