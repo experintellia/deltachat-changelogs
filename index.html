@@ -24,6 +24,7 @@
   .tab img.tint { filter: brightness(0) invert(1); } /* dark theme: make a low-contrast logo white */
   .tab.active { border-color:var(--accent); color:#fff; }
   .sep { width:1px; align-self:stretch; background:var(--line); margin:0 5px; }
+  .tab.navbtn { color:var(--fg); font-weight:600; }
   .layout { display:flex; height:calc(100vh - 118px); }
   aside { width:230px; flex:none; overflow:auto; border-right:1px solid var(--line); padding:10px; }
   .side-head { display:flex; align-items:center; justify-content:space-between; margin:2px 4px 8px; }
@@ -111,11 +112,22 @@ const PROJECTS = [
   { id:"relay", label:"Chatmail Relay", type:"md", logo:"https://github.com/chatmail.png",
     site:"https://chatmail.at", repo:"https://github.com/chatmail/relay", donate:CHATMAIL_DONATE,
     url:"https://raw.githubusercontent.com/chatmail/relay/main/CHANGELOG.md" },
-  { sep:true }, // fork — Arcane Chat (no standalone changelog in the app repo; this is the fork's core)
-  { id:"arcane", label:"Arcane Chat", type:"md", logo:"https://github.com/ArcaneChat.png",
-    site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/core", donate:"https://arcanechat.me/#contribute",
+];
+
+// Forks live on a separate view. Arcane's android app keeps no own changelog beyond the
+// upstream copy it tracks (CHANGELOG-upstream.md); its core fork has its own CHANGELOG.md.
+const ARCANE_DONATE = "https://arcanechat.me/#contribute";
+const FORKS = [
+  { id:"arcane-android", label:"Arcane · Android", type:"md", logo:"https://github.com/ArcaneChat.png",
+    site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/android", donate:ARCANE_DONATE,
+    url:"https://raw.githubusercontent.com/ArcaneChat/android/main/CHANGELOG-upstream.md" },
+  { id:"arcane-core", label:"Arcane · Core", type:"md", logo:"https://github.com/ArcaneChat.png",
+    site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/core", donate:ARCANE_DONATE,
     url:"https://raw.githubusercontent.com/ArcaneChat/core/main/CHANGELOG.md" },
 ];
+
+const byId = id => [...PROJECTS, ...FORKS].find(p => p.id === id);
+const viewOf = id => FORKS.some(f => f.id === id) ? "forks" : "main";
 
 const cache = {};
 let entries = [];      // [{i, ver, date, raw}]
@@ -133,19 +145,36 @@ const searchEl = document.getElementById("search");
 const relBtn = document.getElementById("reltoggle");
 
 // --- tabs as real links: native modifier-click (new tab/window) just works ---
-PROJECTS.forEach(p => {
-  if (p.sep) { const s = document.createElement("span"); s.className = "sep"; tabsEl.appendChild(s); return; }
+function go(id) { // normal in-page navigation to a tab
+  return e => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let browser open new tab/window
+    e.preventDefault();
+    history.pushState({}, "", "?p=" + id);
+    show(id);
+  };
+}
+function mkTab(p) {
   const a = document.createElement("a");
   a.className = "tab"; a.id = "tab-" + p.id; a.href = "?p=" + p.id;
   a.innerHTML = `<img alt="" class="${p.tint ? "tint" : ""}" src="${p.logo}" onerror="this.remove()"><span>${p.label}</span>`;
-  a.onclick = e => {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let browser open new tab/window
-    e.preventDefault();
-    history.pushState({}, "", "?p=" + p.id);
-    show(p.id);
-  };
-  tabsEl.appendChild(a);
-});
+  a.onclick = go(p.id);
+  return a;
+}
+// Build the tab bar for the current view; trailing button switches between views.
+function renderTabs(view) {
+  tabsEl.innerHTML = "";
+  (view === "forks" ? FORKS : PROJECTS).forEach(p => {
+    if (p.sep) { const s = document.createElement("span"); s.className = "sep"; tabsEl.appendChild(s); return; }
+    tabsEl.appendChild(mkTab(p));
+  });
+  tabsEl.appendChild(Object.assign(document.createElement("span"), { className: "sep" }));
+  const target = view === "forks" ? PROJECTS[0].id : FORKS[0].id;
+  const nav = document.createElement("a");
+  nav.className = "tab navbtn"; nav.href = "?p=" + target;
+  nav.textContent = view === "forks" ? "← Clients & community" : "Forks →";
+  nav.onclick = go(target);
+  tabsEl.appendChild(nav);
+}
 window.onpopstate = () => show(currentId());
 searchEl.oninput = renderSidebar;
 relBtn.onclick = () => {
@@ -157,7 +186,7 @@ relBtn.onclick = () => {
 
 function currentId() {
   const id = new URLSearchParams(location.search).get("p");
-  return PROJECTS.some(p => p.id === id) ? id : PROJECTS[0].id;
+  return byId(id) ? id : PROJECTS[0].id;
 }
 
 // A) extract version + date from a heading, whatever the source format.
@@ -195,9 +224,9 @@ function renderLinkbar(p) {
 }
 
 async function show(id) {
-  const p = PROJECTS.find(x => x.id === id);
+  const p = byId(id);
   curId = id;
-  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  renderTabs(viewOf(id));
   document.getElementById("tab-" + id).classList.add("active");
   renderLinkbar(p);
   searchEl.value = "";
