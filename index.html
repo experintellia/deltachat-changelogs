@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeltaChat Changelogs (fan-made)</title>
+<style>
+  :root { --bg:#15171b; --panel:#1d2026; --line:#2c313a; --fg:#e6e8eb; --muted:#9aa3af; --accent:#3793ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.55 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:10px 16px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0 0 2px; font-size:16px; font-weight:600; }
+  header p { margin:0; color:var(--muted); font-size:12px; }
+  nav { display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); }
+  .tab { display:flex; align-items:center; gap:7px; padding:6px 11px; border:1px solid var(--line);
+         border-radius:8px; background:var(--panel); color:var(--fg); cursor:pointer; font-size:13px;
+         text-decoration:none; }
+  .tab img { width:18px; height:18px; border-radius:4px; object-fit:contain; }
+  .tab.active { border-color:var(--accent); color:#fff; }
+  .layout { display:flex; height:calc(100vh - 118px); }
+  aside { width:230px; flex:none; overflow:auto; border-right:1px solid var(--line); padding:10px; }
+  .side-head { display:flex; align-items:center; justify-content:space-between; margin:2px 4px 8px; }
+  .side-head span { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .toggle { background:none; border:1px solid var(--line); color:var(--muted); border-radius:6px;
+            font-size:11px; padding:2px 7px; cursor:pointer; }
+  .toggle.on { color:var(--accent); border-color:var(--accent); }
+  #search { width:100%; padding:5px 8px; margin-bottom:6px; background:var(--panel);
+            border:1px solid var(--line); border-radius:6px; color:var(--fg); font-size:13px; }
+  .yr { font-size:11px; font-weight:700; color:var(--muted); margin:11px 6px 3px; letter-spacing:.04em; }
+  aside a { display:flex; justify-content:space-between; gap:8px; align-items:baseline;
+            padding:3px 6px; color:var(--muted); text-decoration:none; border-radius:5px;
+            border-left:2px solid transparent; }
+  aside a:hover { background:var(--panel); color:var(--fg); }
+  aside a.active { background:var(--panel); color:#fff; border-left-color:var(--accent); }
+  aside a .ver { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  aside a .date { color:var(--muted); font-size:11px; white-space:nowrap; flex:none; }
+  main { flex:1; overflow:auto; padding:8px 26px 60px; }
+  main h1 { font-size:22px; }
+  main h2 { font-size:18px; margin-top:1.6em; padding-top:8px; border-top:1px solid var(--line); scroll-margin-top:12px; }
+  main h3 { font-size:14px; color:var(--muted); }
+  main a { color:var(--accent); }
+  main code { background:var(--panel); padding:1px 4px; border-radius:4px; font-size:.9em; }
+  main pre { background:var(--panel); padding:10px; border-radius:8px; overflow:auto; }
+  .status { color:var(--muted); padding:20px 2px; }
+  .status.err { color:#ff6b6b; }
+</style>
+</head>
+<body>
+<header>
+  <h1>DeltaChat Changelogs <span style="color:var(--muted);font-weight:400">· fan-made viewer</span></h1>
+  <p>Pulled live from GitHub &amp; Codeberg. Unofficial.</p>
+</header>
+<nav id="tabs"></nav>
+<div class="layout">
+  <aside>
+    <div class="side-head"><span>Versions</span>
+      <button id="reltoggle" class="toggle" title="Toggle relative dates">rel date</button></div>
+    <input id="search" type="search" placeholder="filter versions…" autocomplete="off">
+    <div id="toc"></div>
+  </aside>
+  <main><div id="content" class="status">Loading…</div></main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="normalize.js"></script>
+<script>
+const DC = "https://github.com/deltachat.png";
+const PROJECTS = [
+  { id:"desktop", label:"Desktop", type:"md", logo:DC,
+    url:"https://raw.githubusercontent.com/deltachat/deltachat-desktop/main/CHANGELOG.md" },
+  { id:"android", label:"Android", type:"md", logo:DC,
+    url:"https://raw.githubusercontent.com/deltachat/deltachat-android/main/CHANGELOG.md" },
+  { id:"ios", label:"iOS", type:"md", logo:DC,
+    url:"https://raw.githubusercontent.com/deltachat/deltachat-ios/main/CHANGELOG.md" },
+  { id:"core", label:"Core", type:"md", logo:DC,
+    url:"https://raw.githubusercontent.com/deltachat/deltachat-core-rust/main/CHANGELOG.md" },
+  { id:"deltatouch", label:"DeltaTouch", type:"text",
+    logo:"https://codeberg.org/lk108/deltatouch/raw/branch/main/assets/deltatouch.svg",
+    url:"https://codeberg.org/api/v1/repos/lk108/deltatouch/media/CHANGELOG" },
+  { id:"parla", label:"Parla", type:"appdata",
+    logo:"https://raw.githubusercontent.com/trufae/parla/main/parla.svg",
+    url:"https://raw.githubusercontent.com/trufae/parla/main/data/io.github.trufae.Parla.appdata.xml" },
+];
+
+const cache = {};
+let entries = [];      // [{i, ver, date, raw}]
+let relative = false;
+let activeId = null;
+let spy = null;
+let curId = PROJECTS[0].id;
+
+const tabsEl = document.getElementById("tabs");
+const tocEl = document.getElementById("toc");
+const contentEl = document.getElementById("content");
+const mainEl = document.querySelector("main");
+const searchEl = document.getElementById("search");
+const relBtn = document.getElementById("reltoggle");
+
+// --- tabs as real links: native modifier-click (new tab/window) just works ---
+PROJECTS.forEach(p => {
+  const a = document.createElement("a");
+  a.className = "tab"; a.id = "tab-" + p.id; a.href = "?p=" + p.id;
+  a.innerHTML = `<img alt="" src="${p.logo}" onerror="this.remove()"><span>${p.label}</span>`;
+  a.onclick = e => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let browser open new tab/window
+    e.preventDefault();
+    history.pushState({}, "", "?p=" + p.id);
+    show(p.id);
+  };
+  tabsEl.appendChild(a);
+});
+window.onpopstate = () => show(currentId());
+searchEl.oninput = renderSidebar;
+relBtn.onclick = () => {
+  relative = !relative;
+  relBtn.classList.toggle("on", relative);
+  relBtn.textContent = relative ? "abs date" : "rel date";
+  renderSidebar();
+};
+
+function currentId() {
+  const id = new URLSearchParams(location.search).get("p");
+  return PROJECTS.some(p => p.id === id) ? id : PROJECTS[0].id;
+}
+
+// A) extract version + date from a heading, whatever the source format.
+// Date may be full (2026-06-23) or year-month only (2026-06, android/ios).
+const DATE_RE = /\d{4}-\d{2}(?:-\d{2})?/;
+function parseHeading(text) {
+  const ver = (text.match(/\d+\.\d+(?:\.\d+)?/) || [])[0] || text.trim();
+  const date = (text.match(DATE_RE) || [])[0] || null;
+  return { ver, date, raw: text.trim() };
+}
+
+function fmtDate(d) {
+  const full = d.length === 10;
+  const dt = new Date((full ? d : d + "-01") + "T00:00:00");
+  if (relative) {
+    const days = Math.round((Date.now() - dt) / 864e5);
+    if (days <= 0) return "today";
+    if (days < 30) return days + "d ago";
+    if (days < 365) return Math.round(days / 30) + "mo ago";
+    return Math.round(days / 365) + "y ago";
+  }
+  // F) year lives in the sidebar sub-header, so drop it here: long month (+ day if known).
+  return dt.toLocaleDateString(undefined, full ? { month: "long", day: "numeric" } : { month: "long" });
+}
+
+async function show(id) {
+  const p = PROJECTS.find(x => x.id === id);
+  curId = id;
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.getElementById("tab-" + id).classList.add("active");
+  searchEl.value = "";
+  activeId = null;
+  tocEl.innerHTML = "";
+  contentEl.className = "status"; contentEl.textContent = "Loading " + p.label + "…";
+  try {
+    if (!cache[id]) {
+      const res = await fetch(p.url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      cache[id] = await res.text();
+    }
+    contentEl.className = "";
+    contentEl.innerHTML = marked.parse(toMarkdown(p.type, cache[id]));
+    entries = [...contentEl.querySelectorAll("h2")].map((h, i) => {
+      h.id = "v-" + i;
+      const e = parseHeading(h.textContent);
+      if (!e.date) { // android/ios: date sits in the paragraph right below the heading
+        const m = (h.nextElementSibling?.textContent.trim() || "").match(new RegExp("^" + DATE_RE.source));
+        if (m) e.date = m[0];
+      }
+      return { i, ...e };
+    });
+    renderSidebar();
+    setupSpy();
+    if (location.hash) { const t = contentEl.querySelector(location.hash); if (t) t.scrollIntoView(); }
+  } catch (e) {
+    contentEl.className = "status err";
+    contentEl.textContent = "Failed to load " + p.label + ": " + e.message;
+  }
+}
+
+// C) filter + F) year groups, built from the parsed entries.
+function renderSidebar() {
+  const q = searchEl.value.toLowerCase().trim();
+  tocEl.innerHTML = "";
+  let curYear = null;
+  for (const en of entries) {
+    if (q && !(en.ver + " " + (en.date || "") + " " + en.raw).toLowerCase().includes(q)) continue;
+    const year = en.date ? en.date.slice(0, 4) : null;
+    if (year && year !== curYear) {
+      curYear = year;
+      const h = document.createElement("div"); h.className = "yr"; h.textContent = year;
+      tocEl.appendChild(h);
+    }
+    const a = document.createElement("a");
+    a.href = `?p=${curId}#v-${en.i}`;
+    a.dataset.id = "v-" + en.i;
+    a.innerHTML = `<span class="ver"></span>` + (en.date ? `<span class="date"></span>` : "");
+    a.querySelector(".ver").textContent = en.ver;
+    if (en.date) a.querySelector(".date").textContent = fmtDate(en.date);
+    tocEl.appendChild(a);
+  }
+  if (activeId) setActive(activeId);
+}
+
+// D) scroll-spy: highlight the version currently near the top of the content.
+function setupSpy() {
+  if (spy) spy.disconnect();
+  const hs = [...contentEl.querySelectorAll("h2")];
+  spy = new IntersectionObserver(es => {
+    es.forEach(e => e.target._vis = e.isIntersecting);
+    const cur = hs.find(h => h._vis);
+    if (cur) setActive(cur.id);
+  }, { root: mainEl, rootMargin: "0px 0px -75% 0px", threshold: 0 });
+  hs.forEach(h => spy.observe(h));
+}
+
+function setActive(id) {
+  activeId = id;
+  let cur = null;
+  tocEl.querySelectorAll("a").forEach(a => {
+    const on = a.dataset.id === id;
+    a.classList.toggle("active", on);
+    if (on) cur = a;
+  });
+  if (cur) cur.scrollIntoView({ block: "nearest" });
+}
+
+show(currentId());
+</script>
+</body>
+</html>
