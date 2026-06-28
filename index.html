@@ -301,6 +301,14 @@ function renderSidebar() {
     const a = document.createElement("a");
     a.href = `?p=${curId}#v-${en.i}`;
     a.dataset.id = "v-" + en.i;
+    a.onclick = e => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let browser open new tab/window
+      e.preventDefault();
+      // Update the URL without setting location.hash — a real fragment nav flips :target and
+      // forces a full-document style recalc (~250ms on large changelogs). pushState skips that.
+      history.pushState({}, "", a.getAttribute("href"));
+      contentEl.querySelector("#v-" + en.i)?.scrollIntoView();
+    };
     a.innerHTML = `<span class="ver"></span>` + (en.date ? `<span class="date"></span>` : "");
     a.querySelector(".ver").textContent = en.ver;
     if (en.date) a.querySelector(".date").textContent = fmtDate(en.date);
