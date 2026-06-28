@@ -338,19 +338,22 @@ async function show(id) {
   activeId = null;
   tocEl.innerHTML = "";
 
-  // Staged loader. The nextFrame() before each heavy stage lets the tab-switch and the
-  // loader paint first — that's what makes clicking a project feel instant even when the
-  // (cached) parse+render still take a moment. Times are collected and printed at the end.
+  // Staged loader, shown only on a fresh (network) load — that's the reliably-slow path.
+  // A cached re-render is ~150-250ms of blocked parse; showing a loader there would just
+  // flicker, so we skip it and keep the previous content on screen until the swap. The
+  // nextFrame() before each heavy stage still runs in both cases, so the tab-switch paints
+  // before the parse blocks. Times are collected and printed at the end either way.
+  const fresh = !cache[id];
   const stages = [];
-  if (!cache[id]) stages.push({ key: "fetch", label: "Fetching changelog" });
+  if (fresh) stages.push({ key: "fetch", label: "Fetching changelog" });
   stages.push({ key: "parse", label: "Parsing markdown" }, { key: "render", label: "Rendering page" });
   stages.forEach(s => (s.state = "pending"));
   const ms = {};
-  const start = k => { stages.find(s => s.key === k).state = "active"; renderLoader(p, stages); return performance.now(); };
+  const start = k => { stages.find(s => s.key === k).state = "active"; if (fresh) renderLoader(p, stages); return performance.now(); };
   const done = (k, t0) => { const s = stages.find(s => s.key === k); s.ms = ms[k] = Math.round(performance.now() - t0); s.state = "done"; };
 
   try {
-    if (!cache[id]) {
+    if (fresh) {
       const t0 = start("fetch"); await nextFrame();
       const res = await fetch(p.url);
       if (!res.ok) throw new Error("HTTP " + res.status);
