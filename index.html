@@ -41,6 +41,13 @@
   aside a .ver { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   aside a .date { color:var(--muted); font-size:11px; white-space:nowrap; flex:none; }
   main { flex:1; overflow:auto; padding:8px 26px 60px; }
+  #linkbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:6px 2px 8px;
+             border-bottom:1px solid var(--line); }
+  #linkbar:empty { display:none; }
+  #linkbar a { color:var(--muted); text-decoration:none; font-size:13px; }
+  #linkbar a:hover { color:var(--fg); }
+  #linkbar a.donate { color:var(--accent); }
+  #linkbar .dot { color:var(--line); }
   main h1 { font-size:22px; }
   main h2 { font-size:18px; margin-top:1.6em; padding-top:8px; border-top:1px solid var(--line); scroll-margin-top:12px; }
   main h3 { font-size:14px; color:var(--muted); }
@@ -69,33 +76,43 @@
     <input id="search" type="search" placeholder="filter versions…" autocomplete="off">
     <div id="toc"></div>
   </aside>
-  <main><div id="content" class="status">Loading…</div></main>
+  <main><div id="linkbar"></div><div id="content" class="status">Loading…</div></main>
 </div>
 
 <script src="marked.min.js"></script>
 <script src="normalize.js"></script>
 <script>
 const DC = "https://github.com/deltachat.png";
+const DELTA_DONATE = "https://delta.chat/donate";
+const CHATMAIL_DONATE = "https://opencollective.com/chatmail";
 const PROJECTS = [
   { id:"desktop", label:"Desktop", type:"md", logo:DC,
+    site:"https://delta.chat", repo:"https://github.com/deltachat/deltachat-desktop", donate:DELTA_DONATE,
     url:"https://raw.githubusercontent.com/deltachat/deltachat-desktop/main/CHANGELOG.md" },
   { id:"android", label:"Android", type:"md", logo:DC,
+    site:"https://delta.chat", repo:"https://github.com/deltachat/deltachat-android", donate:DELTA_DONATE,
     url:"https://raw.githubusercontent.com/deltachat/deltachat-android/main/CHANGELOG.md" },
   { id:"ios", label:"iOS", type:"md", logo:DC,
+    site:"https://delta.chat", repo:"https://github.com/deltachat/deltachat-ios", donate:DELTA_DONATE,
     url:"https://raw.githubusercontent.com/deltachat/deltachat-ios/main/CHANGELOG.md" },
   { id:"core", label:"Core", type:"md", logo:"https://chatmail.at/assets/logos/chatmail.svg",
+    site:"https://chatmail.at", repo:"https://github.com/deltachat/deltachat-core-rust", donate:CHATMAIL_DONATE,
     url:"https://raw.githubusercontent.com/deltachat/deltachat-core-rust/main/CHANGELOG.md" },
   { id:"deltatouch", label:"DeltaTouch", type:"text",
     logo:"https://codeberg.org/lk108/deltatouch/raw/branch/main/assets/deltatouch.svg",
+    repo:"https://codeberg.org/lk108/deltatouch",
     url:"https://codeberg.org/api/v1/repos/lk108/deltatouch/media/CHANGELOG" },
   { id:"parla", label:"Parla", type:"appdata",
     logo:"https://raw.githubusercontent.com/trufae/parla/main/parla.svg",
+    repo:"https://github.com/trufae/parla",
     url:"https://raw.githubusercontent.com/trufae/parla/main/data/io.github.trufae.Parla.appdata.xml" },
   { sep:true }, // server
   { id:"relay", label:"Chatmail Relay", type:"md", logo:"https://github.com/chatmail.png",
+    site:"https://chatmail.at", repo:"https://github.com/chatmail/relay", donate:CHATMAIL_DONATE,
     url:"https://raw.githubusercontent.com/chatmail/relay/main/CHANGELOG.md" },
   { sep:true }, // fork — Arcane Chat (no standalone changelog in the app repo; this is the fork's core)
   { id:"arcane", label:"Arcane Chat", type:"md", logo:"https://github.com/ArcaneChat.png",
+    site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/core", donate:"https://arcanechat.me/#contribute",
     url:"https://raw.githubusercontent.com/ArcaneChat/core/main/CHANGELOG.md" },
 ];
 
@@ -109,6 +126,7 @@ let curId = PROJECTS[0].id;
 const tabsEl = document.getElementById("tabs");
 const tocEl = document.getElementById("toc");
 const contentEl = document.getElementById("content");
+const linkbarEl = document.getElementById("linkbar");
 const mainEl = document.querySelector("main");
 const searchEl = document.getElementById("search");
 const relBtn = document.getElementById("reltoggle");
@@ -164,11 +182,23 @@ function fmtDate(d) {
   return dt.toLocaleDateString(undefined, full ? { month: "long", day: "numeric" } : { month: "long" });
 }
 
+// Per-project link bar above the changelog: website · repo · donate (each optional).
+function renderLinkbar(p) {
+  const link = (href, text, cls) =>
+    `<a href="${href}" target="_blank" rel="noopener"${cls ? ` class="${cls}"` : ""}>${text}</a>`;
+  const parts = [];
+  if (p.site) parts.push(link(p.site, "Website"));
+  if (p.repo) parts.push(link(p.repo, "Repository"));
+  if (p.donate) parts.push(link(p.donate, "♥ Donate", "donate"));
+  linkbarEl.innerHTML = parts.join('<span class="dot">·</span>');
+}
+
 async function show(id) {
   const p = PROJECTS.find(x => x.id === id);
   curId = id;
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   document.getElementById("tab-" + id).classList.add("active");
+  renderLinkbar(p);
   searchEl.value = "";
   activeId = null;
   tocEl.innerHTML = "";
