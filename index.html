@@ -7,8 +7,9 @@
 <style>
   :root { --bg:#15171b; --panel:#1d2026; --line:#2c313a; --fg:#e6e8eb; --muted:#9aa3af; --accent:#3793ff; }
   * { box-sizing:border-box; }
-  body { margin:0; font:15px/1.55 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
-  header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start;
+  body { margin:0; font:15px/1.55 system-ui,sans-serif; background:var(--bg); color:var(--fg);
+         height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { flex:none; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start;
            gap:10px 16px; padding:10px 16px; border-bottom:1px solid var(--line); }
   header h1 { margin:0 0 3px; font-size:16px; font-weight:600; }
   header h1 .tag { color:var(--muted); font-weight:400; }
@@ -18,7 +19,7 @@
                border:1px solid var(--line); padding:4px 9px; border-radius:7px; white-space:nowrap; }
   .actions a:hover { color:var(--fg); border-color:var(--accent); }
   .actions a.viewtoggle { color:var(--accent); border-color:var(--accent); }
-  nav { display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); }
+  nav { flex:none; display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); }
   .tab { display:flex; align-items:center; gap:7px; padding:6px 11px; border:1px solid var(--line);
          border-radius:8px; background:var(--panel); color:var(--fg); cursor:pointer; font-size:13px;
          text-decoration:none; }
@@ -27,7 +28,7 @@
   .tab.active { border-color:var(--accent); color:#fff; }
   .sep { width:1px; align-self:stretch; background:var(--line); margin:0 5px; }
   .tab.navbtn { color:var(--fg); font-weight:600; }
-  .layout { display:flex; height:calc(100vh - 118px); }
+  .layout { display:flex; flex:1; min-height:0; }
   aside { width:230px; flex:none; overflow:auto; border-right:1px solid var(--line); padding:10px; }
   .side-head { display:flex; align-items:center; justify-content:space-between; margin:2px 4px 8px; }
   .side-head span { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
