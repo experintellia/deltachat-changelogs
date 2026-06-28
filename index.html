@@ -53,6 +53,9 @@
   #linkbar a:hover { color:var(--fg); }
   #linkbar a.donate { color:var(--accent); }
   #linkbar .dot { color:var(--line); }
+  /* Off-screen versions skip layout/paint until scrolled near — stops the first
+     paint of a multi-year changelog from blocking the main thread on mobile. */
+  main section { content-visibility:auto; contain-intrinsic-size:auto 600px; }
   main h1 { font-size:22px; }
   main h2 { font-size:18px; margin-top:1.6em; padding-top:8px; border-top:1px solid var(--line); scroll-margin-top:12px; }
   main h3 { font-size:14px; color:var(--muted); }
@@ -61,6 +64,17 @@
   main pre { background:var(--panel); padding:10px; border-radius:8px; overflow:auto; }
   .status { color:var(--muted); padding:20px 2px; }
   .status.err { color:#ff6b6b; }
+  .loader { padding:26px 4px; max-width:440px; }
+  .loader h3 { margin:0 0 14px; font-size:15px; color:var(--fg); }
+  .loader .stage { display:flex; align-items:center; gap:10px; padding:6px 0; color:var(--muted); font-size:13px; }
+  .loader .stage .ic { width:14px; height:14px; border-radius:50%; border:2px solid var(--line); flex:none; }
+  .loader .stage.active { color:var(--accent); }
+  .loader .stage.active .ic { border-color:var(--accent); border-top-color:transparent; animation:spin .6s linear infinite; }
+  .loader .stage.done { color:var(--fg); }
+  .loader .stage.done .ic { border-color:var(--accent); background:var(--accent); }
+  .loader .stage .ms { margin-left:auto; color:var(--muted); font-size:12px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .timings { margin-top:32px; padding-top:10px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
 
   /* --- mobile (<=720px): TOC becomes a drawer, tabs scroll, header collapses on scroll --- */
   #backdrop, #fab { display:none; }
@@ -76,7 +90,7 @@
     nav .tab, nav .sep { flex:none; }
     main { padding:8px 14px 40px; }
     aside { position:fixed; top:0; left:0; bottom:0; width:min(84vw,300px); z-index:50; padding:12px;
-            transform:translateX(-100%); transition:transform .2s ease; }
+            background:var(--bg); transform:translateX(-100%); transition:transform .2s ease; }
     aside a { padding:8px; }
     body.drawer-open aside { transform:translateX(0); }
     #backdrop { display:block; position:fixed; inset:0; z-index:45; background:rgba(0,0,0,.5);
@@ -283,6 +297,31 @@ function renderLinkbar(p) {
   linkbarEl.innerHTML = parts.join('<span class="dot">·</span>');
 }
 
+// Group each version (h2 → next h2) into a <section> so content-visibility can skip
+// off-screen ones. Nodes before the first h2 stay at top level. The h2 keeps its id,
+// so scroll-spy and #v-i scroll targets are unaffected.
+function wrapSections() {
+  let sec = null;
+  for (const n of [...contentEl.childNodes]) {
+    if (n.nodeType === 1 && n.tagName === "H2") {
+      sec = document.createElement("section");
+      contentEl.insertBefore(sec, n);
+    }
+    if (sec) sec.appendChild(n);
+  }
+}
+
+// yield until the browser has actually painted, so the loader/tab-switch shows
+// before a heavy synchronous stage blocks the main thread.
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+function renderLoader(p, stages) {
+  contentEl.className = "loader";
+  contentEl.innerHTML = `<h3>Loading ${p.label}…</h3>` + stages.map(s =>
+    `<div class="stage ${s.state}"><span class="ic"></span><span>${s.label}</span>` +
+    `<span class="ms">${s.ms != null ? s.ms + " ms" : ""}</span></div>`).join("");
+}
+
 async function show(id) {
   const p = byId(id);
   curId = id;
@@ -294,15 +333,37 @@ async function show(id) {
   searchEl.value = "";
   activeId = null;
   tocEl.innerHTML = "";
-  contentEl.className = "status"; contentEl.textContent = "Loading " + p.label + "…";
+
+  // Staged loader. The nextFrame() before each heavy stage lets the tab-switch and the
+  // loader paint first — that's what makes clicking a project feel instant even when the
+  // (cached) parse+render still take a moment. Times are collected and printed at the end.
+  const stages = [];
+  if (!cache[id]) stages.push({ key: "fetch", label: "Fetching changelog" });
+  stages.push({ key: "parse", label: "Parsing markdown" }, { key: "render", label: "Rendering page" });
+  stages.forEach(s => (s.state = "pending"));
+  const ms = {};
+  const start = k => { stages.find(s => s.key === k).state = "active"; renderLoader(p, stages); return performance.now(); };
+  const done = (k, t0) => { const s = stages.find(s => s.key === k); s.ms = ms[k] = Math.round(performance.now() - t0); s.state = "done"; };
+
   try {
     if (!cache[id]) {
+      const t0 = start("fetch"); await nextFrame();
       const res = await fetch(p.url);
       if (!res.ok) throw new Error("HTTP " + res.status);
       cache[id] = await res.text();
+      done("fetch", t0);
     }
+
+    let t0 = start("parse"); await nextFrame();
+    const html = marked.parse(toMarkdown(p.type, cache[id]));
+    done("parse", t0);
+
+    t0 = start("render"); await nextFrame(); // loader paints "Rendering…", then we replace it with the real content
     contentEl.className = "";
-    contentEl.innerHTML = marked.parse(toMarkdown(p.type, cache[id]));
+    contentEl.innerHTML = html;
+    done("render", t0);
+
+    t0 = performance.now();
     entries = [...contentEl.querySelectorAll("h2")].map((h, i) => {
       h.id = "v-" + i;
       const e = parseHeading(h.textContent);
@@ -312,8 +373,22 @@ async function show(id) {
       }
       return { i, ...e };
     });
+    wrapSections(); // must run after the date-from-next-sibling read above
+    ms.index = Math.round(performance.now() - t0);
+
+    t0 = performance.now();
     renderSidebar();
     setupSpy();
+    ms.sidebar = Math.round(performance.now() - t0);
+
+    const order = [["fetch", "Fetch"], ["parse", "Parse"], ["render", "Render"], ["index", "Index"], ["sidebar", "Sidebar"]];
+    const total = Object.values(ms).reduce((a, b) => a + b, 0);
+    const foot = document.createElement("div");
+    foot.className = "timings";
+    foot.textContent = `Loaded in ${total} ms — ` +
+      order.filter(([k]) => ms[k] != null).map(([k, l]) => `${l} ${ms[k]} ms`).join(" · ");
+    contentEl.appendChild(foot);
+
     if (location.hash) { const t = contentEl.querySelector(location.hash); if (t) t.scrollIntoView(); }
     else mainEl.scrollTop = 0; // new project starts at top → header re-expands on mobile
   } catch (e) {
