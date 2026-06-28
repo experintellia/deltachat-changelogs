@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markdown parser benchmark</title>
+<style>
+  :root { --bg:#15171b; --panel:#1d2026; --line:#2c313a; --fg:#e6e8eb; --muted:#9aa3af; --accent:#3793ff; --win:#3ddc84; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--fg); padding:18px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p { color:var(--muted); font-size:13px; margin:0 0 14px; max-width:680px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  select, button { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:7px;
+                   padding:8px 12px; font-size:14px; }
+  button { color:var(--accent); border-color:var(--accent); cursor:pointer; font-weight:600; }
+  button:disabled { color:var(--muted); border-color:var(--line); cursor:default; }
+  #status { color:var(--muted); font-size:13px; min-height:20px; margin-bottom:10px; }
+  table { border-collapse:collapse; width:100%; max-width:680px; font-size:14px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.win td { color:var(--win); }
+  tr.err td { color:#ff6b6b; }
+  .bar { height:6px; background:var(--accent); border-radius:3px; }
+  .lib { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<h1>Markdown parser benchmark</h1>
+<p>Parses a real DeltaChat changelog with several parsers and reports the best time of a few runs
+   (slow parsers run once to avoid freezing the device). Open this on the phone you care about —
+   the whole point is that Safari/JavaScriptCore behaves very differently from desktop V8.</p>
+
+<div class="row">
+  <label>Changelog: <select id="src"></select></label>
+  <button id="run">Run benchmark</button>
+</div>
+<div id="status">Pick a changelog and press Run.</div>
+<table>
+  <thead><tr><th>Parser</th><th class="num">Best</th><th class="num">Runs</th><th class="num">HTML</th><th></th></tr></thead>
+  <tbody id="out"></tbody>
+</table>
+
+<script type="module">
+import { marked }      from "https://cdn.jsdelivr.net/npm/marked@15/+esm";
+import markdownit      from "https://cdn.jsdelivr.net/npm/markdown-it@14/+esm";
+import snarkdown       from "https://cdn.jsdelivr.net/npm/snarkdown@2/+esm";
+import { micromark }   from "https://cdn.jsdelivr.net/npm/micromark@4/+esm";
+
+const SOURCES = {
+  "Desktop (~210 KB)": "https://raw.githubusercontent.com/deltachat/deltachat-desktop/main/CHANGELOG.md",
+  "iOS (~92 KB)":      "https://raw.githubusercontent.com/deltachat/deltachat-ios/main/CHANGELOG.md",
+  "Android":           "https://raw.githubusercontent.com/deltachat/deltachat-android/main/CHANGELOG.md",
+  "Core":              "https://raw.githubusercontent.com/deltachat/deltachat-core-rust/main/CHANGELOG.md",
+};
+const mdit = markdownit();
+const PARSERS = [
+  ["marked (current)", s => marked.parse(s)],
+  ["marked · gfm off", s => marked.parse(s, { gfm: false })], // isolates GFM autolinker (a common ReDoS source)
+  ["markdown-it",      s => mdit.render(s)],
+  ["micromark",        s => micromark(s)],
+  ["snarkdown (tiny)", s => snarkdown(s)],
+];
+
+const srcEl = document.getElementById("src");
+const outEl = document.getElementById("out");
+const statusEl = document.getElementById("status");
+const runBtn = document.getElementById("run");
+Object.keys(SOURCES).forEach(k => srcEl.add(new Option(k, k)));
+
+const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+// One run first; only repeat if it was fast enough not to lock the device for seconds.
+function bench(fn, s) {
+  const t0 = performance.now();
+  const out = fn(s);
+  let best = performance.now() - t0;
+  const reps = best < 800 ? 4 : 0;
+  for (let i = 0; i < reps; i++) { const t = performance.now(); fn(s); best = Math.min(best, performance.now() - t); }
+  return { ms: Math.round(best), runs: reps + 1, len: out.length };
+}
+
+runBtn.onclick = async () => {
+  runBtn.disabled = true;
+  outEl.innerHTML = "";
+  const url = SOURCES[srcEl.value];
+  statusEl.textContent = "Fetching " + srcEl.value + "…";
+  let md;
+  try { md = await (await fetch(url)).text(); }
+  catch (e) { statusEl.textContent = "Fetch failed: " + e.message; runBtn.disabled = false; return; }
+  statusEl.textContent = `Loaded ${md.length.toLocaleString()} chars. Benchmarking…`;
+
+  const results = [];
+  for (const [name, fn] of PARSERS) {
+    const tr = outEl.insertRow();
+    tr.innerHTML = `<td>${name}</td><td class="num lib">running…</td><td></td><td></td><td></td>`;
+    await frame(); // paint "running…" before the (possibly multi-second) blocking run
+    try {
+      const r = bench(fn, md);
+      results.push({ name, ...r, tr });
+      tr.cells[1].textContent = r.ms + " ms";
+      tr.cells[1].classList.remove("lib");
+      tr.cells[2].className = "num"; tr.cells[2].textContent = r.runs;
+      tr.cells[3].className = "num"; tr.cells[3].textContent = (r.len / 1024 | 0) + " KB";
+    } catch (e) {
+      tr.className = "err";
+      tr.cells[1].textContent = "error"; tr.cells[1].classList.remove("lib");
+      tr.cells[2].colSpan = 3; tr.cells[2].textContent = e.message;
+    }
+    await frame();
+  }
+
+  // mark the fastest, draw relative bars
+  if (results.length) {
+    const min = Math.min(...results.map(r => r.ms));
+    const max = Math.max(...results.map(r => r.ms));
+    results.forEach(r => {
+      if (r.ms === min) r.tr.className = "win";
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      bar.style.width = Math.max(3, (r.ms / max) * 120) + "px";
+      r.tr.cells[4].appendChild(bar);
+    });
+    statusEl.textContent = `Done. Fastest: ${results.find(r => r.ms === min).name} (${min} ms) vs marked ${results[0].ms} ms.`;
+  }
+  runBtn.disabled = false;
+};
+</script>
+</body>
+</html>
