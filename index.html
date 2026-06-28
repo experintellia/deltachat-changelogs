@@ -21,6 +21,7 @@
          border-radius:8px; background:var(--panel); color:var(--fg); cursor:pointer; font-size:13px;
          text-decoration:none; }
   .tab img { width:18px; height:18px; border-radius:4px; object-fit:contain; }
+  .tab img.tint { filter: brightness(0) invert(1); } /* dark theme: make a low-contrast logo white */
   .tab.active { border-color:var(--accent); color:#fff; }
   .sep { width:1px; align-self:stretch; background:var(--line); margin:0 5px; }
   .layout { display:flex; height:calc(100vh - 118px); }
@@ -95,9 +96,6 @@ const PROJECTS = [
   { id:"ios", label:"iOS", type:"md", logo:DC,
     site:"https://delta.chat", repo:"https://github.com/deltachat/deltachat-ios", donate:DELTA_DONATE,
     url:"https://raw.githubusercontent.com/deltachat/deltachat-ios/main/CHANGELOG.md" },
-  { id:"core", label:"Core", type:"md", logo:"https://chatmail.at/assets/logos/chatmail.svg",
-    site:"https://chatmail.at", repo:"https://github.com/deltachat/deltachat-core-rust", donate:CHATMAIL_DONATE,
-    url:"https://raw.githubusercontent.com/deltachat/deltachat-core-rust/main/CHANGELOG.md" },
   { id:"deltatouch", label:"DeltaTouch", type:"text",
     logo:"https://codeberg.org/lk108/deltatouch/raw/branch/main/assets/deltatouch.svg",
     repo:"https://codeberg.org/lk108/deltatouch",
@@ -106,7 +104,10 @@ const PROJECTS = [
     logo:"https://raw.githubusercontent.com/trufae/parla/main/parla.svg",
     repo:"https://github.com/trufae/parla",
     url:"https://raw.githubusercontent.com/trufae/parla/main/data/io.github.trufae.Parla.appdata.xml" },
-  { sep:true }, // server
+  { sep:true }, // chatmail: core + relay
+  { id:"core", label:"Core", type:"md", logo:"https://chatmail.at/assets/logos/chatmail.svg", tint:true,
+    site:"https://chatmail.at", repo:"https://github.com/deltachat/deltachat-core-rust", donate:CHATMAIL_DONATE,
+    url:"https://raw.githubusercontent.com/deltachat/deltachat-core-rust/main/CHANGELOG.md" },
   { id:"relay", label:"Chatmail Relay", type:"md", logo:"https://github.com/chatmail.png",
     site:"https://chatmail.at", repo:"https://github.com/chatmail/relay", donate:CHATMAIL_DONATE,
     url:"https://raw.githubusercontent.com/chatmail/relay/main/CHANGELOG.md" },
@@ -136,7 +137,7 @@ PROJECTS.forEach(p => {
   if (p.sep) { const s = document.createElement("span"); s.className = "sep"; tabsEl.appendChild(s); return; }
   const a = document.createElement("a");
   a.className = "tab"; a.id = "tab-" + p.id; a.href = "?p=" + p.id;
-  a.innerHTML = `<img alt="" src="${p.logo}" onerror="this.remove()"><span>${p.label}</span>`;
+  a.innerHTML = `<img alt="" class="${p.tint ? "tint" : ""}" src="${p.logo}" onerror="this.remove()"><span>${p.label}</span>`;
   a.onclick = e => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let browser open new tab/window
     e.preventDefault();
