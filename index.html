@@ -8,7 +8,7 @@
   :root { --bg:#15171b; --panel:#1d2026; --line:#2c313a; --fg:#e6e8eb; --muted:#9aa3af; --accent:#3793ff; }
   * { box-sizing:border-box; }
   body { margin:0; font:15px/1.55 system-ui,sans-serif; background:var(--bg); color:var(--fg);
-         height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+         height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
   header { flex:none; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start;
            gap:10px 16px; padding:10px 16px; border-bottom:1px solid var(--line); }
   header h1 { margin:0 0 3px; font-size:16px; font-weight:600; }
@@ -61,6 +61,30 @@
   main pre { background:var(--panel); padding:10px; border-radius:8px; overflow:auto; }
   .status { color:var(--muted); padding:20px 2px; }
   .status.err { color:#ff6b6b; }
+
+  /* --- mobile (<=720px): TOC becomes a drawer, tabs scroll, header collapses on scroll --- */
+  #backdrop, #fab { display:none; }
+  #fab { position:fixed; left:16px; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); z-index:55;
+         align-items:center; gap:6px; background:var(--accent); color:#fff; border:none; border-radius:22px;
+         padding:10px 15px; font-size:14px; font-weight:600; box-shadow:0 3px 12px rgba(0,0,0,.45); cursor:pointer; }
+  @media (max-width:720px) {
+    header p { display:none; }
+    header h1 { font-size:15px; }
+    header { transition:max-height .2s ease, padding .2s ease, opacity .15s ease; overflow:hidden; max-height:240px; }
+    body.scrolled header { max-height:0; padding-top:0; padding-bottom:0; opacity:0; border-bottom:0; }
+    nav { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    nav .tab, nav .sep { flex:none; }
+    main { padding:8px 14px 40px; }
+    aside { position:fixed; top:0; left:0; bottom:0; width:min(84vw,300px); z-index:50; padding:12px;
+            transform:translateX(-100%); transition:transform .2s ease; }
+    aside a { padding:8px; }
+    body.drawer-open aside { transform:translateX(0); }
+    #backdrop { display:block; position:fixed; inset:0; z-index:45; background:rgba(0,0,0,.5);
+                opacity:0; pointer-events:none; transition:opacity .2s ease; }
+    body.drawer-open #backdrop { opacity:1; pointer-events:auto; }
+    #fab { display:flex; }
+    body.drawer-open #fab { display:none; }
+  }
 </style>
 </head>
 <body>
@@ -85,6 +109,8 @@
   </aside>
   <main><div id="linkbar"></div><div id="content" class="status">Loading…</div></main>
 </div>
+<div id="backdrop"></div>
+<button id="fab" aria-label="Show versions">☰ Versions</button>
 
 <script src="marked.min.js"></script>
 <script src="normalize.js"></script>
@@ -181,12 +207,12 @@ function renderTabs(view) {
 const VIEW_META = {
   main: {
     title: 'DeltaChat Changelogs <span class="tag">· fan-made unofficial viewer</span>',
-    sub: 'Official Delta Chat &amp; chatmail clients, plus community clients that aim to follow the official ones fairly closely. Pulled live from GitHub &amp; Codeberg.',
+    sub: 'Official Delta Chat &amp; chatmail clients, plus community clients that aim to follow the official ones fairly closely.<br>Pulled live from GitHub &amp; Codeberg.',
     toggle: 'Forks →', target: () => FORKS[0].id,
   },
   forks: {
     title: 'DeltaChat Forks <span class="tag">· fan-made unofficial viewer</span>',
-    sub: 'Forks add new features and make different decisions in some areas. Sometimes those features are later taken up by the official/upstream project. Pulled live.',
+    sub: 'Forks add new features and make different decisions in some areas. Sometimes those features are later taken up by the official/upstream project.<br>Pulled live.',
     toggle: '← Clients & community', target: () => PROJECTS[0].id,
   },
 };
@@ -207,6 +233,16 @@ relBtn.onclick = () => {
   relBtn.textContent = relative ? "abs date" : "rel date";
   renderSidebar();
 };
+
+// mobile: TOC drawer + collapse the header once the content is scrolled
+const setDrawer = open => document.body.classList.toggle("drawer-open", open);
+document.getElementById("fab").onclick = () => setDrawer(true);
+document.getElementById("backdrop").onclick = () => setDrawer(false);
+let scrolled = false;
+mainEl.addEventListener("scroll", () => {
+  const s = mainEl.scrollTop > 8;
+  if (s !== scrolled) { scrolled = s; document.body.classList.toggle("scrolled", s); }
+}, { passive: true });
 
 function currentId() {
   const id = new URLSearchParams(location.search).get("p");
@@ -279,6 +315,7 @@ async function show(id) {
     renderSidebar();
     setupSpy();
     if (location.hash) { const t = contentEl.querySelector(location.hash); if (t) t.scrollIntoView(); }
+    else mainEl.scrollTop = 0; // new project starts at top → header re-expands on mobile
   } catch (e) {
     contentEl.className = "status err";
     contentEl.textContent = "Failed to load " + p.label + ": " + e.message;
@@ -308,6 +345,7 @@ function renderSidebar() {
       // forces a full-document style recalc (~250ms on large changelogs). pushState skips that.
       history.pushState({}, "", a.getAttribute("href"));
       contentEl.querySelector("#v-" + en.i)?.scrollIntoView();
+      document.body.classList.remove("drawer-open"); // close the mobile drawer on select
     };
     a.innerHTML = `<span class="ver"></span>` + (en.date ? `<span class="date"></span>` : "");
     a.querySelector(".ver").textContent = en.ver;
