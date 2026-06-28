@@ -11,9 +11,11 @@
   header { position:relative; padding:10px 16px; border-bottom:1px solid var(--line); }
   header h1 { margin:0 0 2px; font-size:16px; font-weight:600; }
   header p { margin:0; color:var(--muted); font-size:12px; }
-  .src { position:absolute; top:12px; right:16px; color:var(--muted); text-decoration:none;
-         font-size:12px; border:1px solid var(--line); padding:4px 9px; border-radius:7px; }
-  .src:hover { color:var(--fg); border-color:var(--accent); }
+  .actions { position:absolute; top:12px; right:16px; display:flex; gap:8px; }
+  .actions a { color:var(--muted); text-decoration:none; font-size:12px;
+               border:1px solid var(--line); padding:4px 9px; border-radius:7px; }
+  .actions a:hover { color:var(--fg); border-color:var(--accent); }
+  .actions a.donate { color:var(--accent); border-color:var(--accent); }
   nav { display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); }
   .tab { display:flex; align-items:center; gap:7px; padding:6px 11px; border:1px solid var(--line);
          border-radius:8px; background:var(--panel); color:var(--fg); cursor:pointer; font-size:13px;
@@ -52,7 +54,11 @@
 <header>
   <h1>DeltaChat Changelogs <span style="color:var(--muted);font-weight:400">· fan-made viewer</span></h1>
   <p>Pulled live from GitHub &amp; Codeberg. Unofficial.</p>
-  <a class="src" href="https://github.com/experintellia/deltachat-changelogs" target="_blank" rel="noopener">Source ↗</a>
+  <div class="actions">
+    <a class="donate" href="https://delta.chat/donate" target="_blank" rel="noopener">♥ Donate to Delta Chat</a>
+    <a href="https://github.com/experintellia/deltachat-changelogs" target="_blank" rel="noopener"
+       title="Source code of this viewer page (not the changelogs)">Page source ↗</a>
+  </div>
 </header>
 <nav id="tabs"></nav>
 <div class="layout">
