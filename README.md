@@ -30,7 +30,8 @@ node test.js
 - `normalize.js` — turns each source into markdown (`## <version>` headings) so the
   page has one render path. Markdown sources pass through; DeltaTouch's plain-text
   log gets headings via regex; Parla's AppStream `appdata.xml` is parsed to markdown.
-- `marked.min.js` — vendored markdown renderer ([marked](https://github.com/markedjs/marked), MIT). No CDN.
+- `markdown-it.min.js` — vendored markdown renderer ([markdown-it](https://github.com/markdown-it/markdown-it), MIT). No CDN. (Replaced marked, whose regexes hit catastrophic backtracking in iOS Safari/JSC — ~9s on the desktop changelog.)
+- `benchmark.html` — on-device parser speed comparison (loads parsers from CDN).
 
 DeltaTouch is fetched through Codeberg's API `media` endpoint (CORS-enabled, unlike raw).
 

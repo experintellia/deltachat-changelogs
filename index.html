@@ -126,7 +126,7 @@
 <div id="backdrop"></div>
 <button id="fab" aria-label="Show versions">☰ Versions</button>
 
-<script src="marked.min.js"></script>
+<script src="markdown-it.min.js"></script>
 <script src="normalize.js"></script>
 <script>
 const DC = "https://github.com/deltachat.png";
@@ -174,6 +174,10 @@ const FORKS = [
 const byId = id => [...PROJECTS, ...FORKS].find(p => p.id === id);
 const viewOf = id => FORKS.some(f => f.id === id) ? "forks" : "main";
 
+// markdown-it instead of marked: marked v15's regexes hit catastrophic backtracking in
+// iOS Safari/JSC (9s on the desktop changelog) though they're fine in V8. html:true keeps
+// the raw <a id> anchors and matches marked's old passthrough behaviour.
+const md = markdownit({ html: true });
 const cache = {};
 let entries = [];      // [{i, ver, date, raw}]
 let relative = false;
@@ -355,7 +359,7 @@ async function show(id) {
     }
 
     let t0 = start("parse"); await nextFrame();
-    const html = marked.parse(toMarkdown(p.type, cache[id]));
+    const html = md.render(toMarkdown(p.type, cache[id]));
     done("parse", t0);
 
     t0 = start("render"); await nextFrame(); // loader paints "Rendering…", then we replace it with the real content
