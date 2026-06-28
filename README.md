@@ -4,7 +4,7 @@ Unofficial changelog viewer for the DeltaChat ecosystem. A single static page th
 pulls changelogs **live** from GitHub and Codeberg — tabs per client, sidebar TOC
 with year groups, search, scroll-spy, and a relative-date toggle.
 
-Clients: Desktop · Android · iOS · DeltaTouch · Core · Parla.
+Clients: Desktop · Android · iOS · DeltaTouch · Core · Parla · Chatmail Relay (server) · Arcane Chat (fork).
 
 ## Run
 

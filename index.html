@@ -22,6 +22,7 @@
          text-decoration:none; }
   .tab img { width:18px; height:18px; border-radius:4px; object-fit:contain; }
   .tab.active { border-color:var(--accent); color:#fff; }
+  .sep { width:1px; align-self:stretch; background:var(--line); margin:0 5px; }
   .layout { display:flex; height:calc(100vh - 118px); }
   aside { width:230px; flex:none; overflow:auto; border-right:1px solid var(--line); padding:10px; }
   .side-head { display:flex; align-items:center; justify-content:space-between; margin:2px 4px 8px; }
@@ -90,6 +91,12 @@ const PROJECTS = [
   { id:"parla", label:"Parla", type:"appdata",
     logo:"https://raw.githubusercontent.com/trufae/parla/main/parla.svg",
     url:"https://raw.githubusercontent.com/trufae/parla/main/data/io.github.trufae.Parla.appdata.xml" },
+  { sep:true }, // server
+  { id:"relay", label:"Chatmail Relay", type:"md", logo:"https://github.com/chatmail.png",
+    url:"https://raw.githubusercontent.com/chatmail/relay/main/CHANGELOG.md" },
+  { sep:true }, // fork — Arcane Chat (no standalone changelog in the app repo; this is the fork's core)
+  { id:"arcane", label:"Arcane Chat", type:"md", logo:"https://github.com/ArcaneChat.png",
+    url:"https://raw.githubusercontent.com/ArcaneChat/core/main/CHANGELOG.md" },
 ];
 
 const cache = {};
@@ -108,6 +115,7 @@ const relBtn = document.getElementById("reltoggle");
 
 // --- tabs as real links: native modifier-click (new tab/window) just works ---
 PROJECTS.forEach(p => {
+  if (p.sep) { const s = document.createElement("span"); s.className = "sep"; tabsEl.appendChild(s); return; }
   const a = document.createElement("a");
   a.className = "tab"; a.id = "tab-" + p.id; a.href = "?p=" + p.id;
   a.innerHTML = `<img alt="" src="${p.logo}" onerror="this.remove()"><span>${p.label}</span>`;
