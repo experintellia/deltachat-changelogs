@@ -168,6 +168,9 @@ const FORKS = [
   { id:"arcane-core", label:"Arcane · Core", type:"md", logo:"https://github.com/ArcaneChat.png",
     site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/core", donate:ARCANE_DONATE,
     url:"https://raw.githubusercontent.com/ArcaneChat/core/main/CHANGELOG.md" },
+  // ponytail: Slothful runs this same viewer itself, so just link out instead of embedding it.
+  { label:"Slothful · Web ↗", logo:"https://web.slothful.chat/favicon.ico",
+    link:"https://web.slothful.chat/changelog/?p=web-app" },
 ];
 
 const byId = id => [...PROJECTS, ...FORKS].find(p => p.id === id);
@@ -206,6 +209,11 @@ function go(id) { // normal in-page navigation to a tab
 }
 function mkTab(p) {
   const a = document.createElement("a");
+  if (p.link) { // external tab: plain link, opens in a new tab
+    a.className = "tab"; a.href = p.link; a.target = "_blank"; a.rel = "noopener";
+    a.innerHTML = `<img alt="" src="${p.logo}" onerror="this.remove()"><span>${p.label}</span>`;
+    return a;
+  }
   a.className = "tab"; a.id = "tab-" + p.id; a.href = "?p=" + p.id;
   a.innerHTML = `<img alt="" class="${p.tint ? "tint" : ""}" src="${p.logo}" onerror="this.remove()"><span>${p.label}</span>`;
   a.onclick = go(p.id);
