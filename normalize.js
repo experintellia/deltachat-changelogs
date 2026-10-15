@@ -23,13 +23,13 @@ function appdataToMarkdown(xml) {
   }).join("\n\n");
 }
 
-// Parla for Haiku keeps one notes file per release (docs/releases/v0.1.5.md), no dates.
-// notes: [{ver, text}] -> newest first, each under "## <ver>". A file's own "# title"
+// Parla for Haiku keeps one notes file per release (docs/releases/v0.1.5.md).
+// notes: [{ver, date?, text}] -> newest first, each under "## <ver> — <date>". A file's own "# title"
 // is dropped and its headings pushed down a level so they don't become versions.
 function joinReleaseNotes(notes) {
   return [...notes]
     .sort((a, b) => b.ver.localeCompare(a.ver, undefined, { numeric: true }))
-    .map(n => `## ${n.ver}\n\n` + n.text.replace(/^# .*\n/, "").replace(/^(#+ )/gm, "#$1"))
+    .map(n => `## ${n.ver}${n.date ? " — " + n.date : ""}\n\n` + n.text.replace(/^# .*\n/, "").replace(/^(#+ )/gm, "#$1"))
     .join("\n\n");
 }
 

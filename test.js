@@ -9,10 +9,10 @@ assert(!out.includes("## Feature"), "non-version lines must not become headings"
 
 const joined = joinReleaseNotes([
   { ver: "0.1.0", text: "First\n" }, { ver: "0.1.10", text: "# Parla 0.1.10\nTen\n## Downloads\n" },
-  { ver: "0.1.0-2", text: "Repair\n" }, { ver: "0.1.2", text: "Two\n" },
+  { ver: "0.1.0-2", date: "2026-10-13", text: "Repair\n" }, { ver: "0.1.2", text: "Two\n" },
 ]);
-assert.deepStrictEqual(joined.match(/^## .*/gm), ["## 0.1.10", "## 0.1.2", "## 0.1.0-2", "## 0.1.0"],
-  "releases newest first, numeric, repair build after its base");
+assert.deepStrictEqual(joined.match(/^## .*/gm), ["## 0.1.10", "## 0.1.2", "## 0.1.0-2 — 2026-10-13", "## 0.1.0"],
+  "releases newest first, numeric, repair build after its base, date when known");
 assert(joined.includes("### Downloads") && !joined.includes("# Parla"), "file headings demoted, title dropped");
 
 console.log("ok");

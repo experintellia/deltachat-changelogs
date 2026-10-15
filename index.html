@@ -177,7 +177,8 @@ const FORKS = [
   { id:"parla-haiku", label:"Parla · Haiku", type:"releasedir",
     logo:"https://raw.githubusercontent.com/trufae/parla/main/parla.svg",
     repo:"https://github.com/trufae/parla-haiku",
-    url:"https://api.github.com/repos/trufae/parla-haiku/contents/docs/releases" },
+    url:"https://api.github.com/repos/trufae/parla-haiku/contents/docs/releases",
+    releases:"https://api.github.com/repos/trufae/parla-haiku/releases?per_page=100" },
   // ponytail: Slothful runs this same viewer itself, so just link out instead of embedding it.
   { label:"Slothful · Web ↗",
     logo:"https://raw.githubusercontent.com/experintellia/slothfulchat-web/main/packages/web-app/static/images/icon-256.png",
@@ -352,11 +353,20 @@ async function fetchText(url) {
   return res.text();
 }
 // One notes file per release: list the folder via the GitHub contents API (unauthenticated,
-// 60 req/h per IP; once per page load thanks to cache), fetch every v*.md, join newest first.
-async function fetchReleaseDir(api) {
-  const files = JSON.parse(await fetchText(api)).filter(f => /^v.+\.md$/.test(f.name));
-  return joinReleaseNotes(await Promise.all(files.map(async f =>
-    ({ ver: f.name.slice(1, -3), text: await fetchText(f.download_url) }))));
+// 60 req/h per IP; two calls per load, once per page load thanks to cache), fetch every v*.md,
+// join newest first. Dates come from the GitHub release whose tag is the file name (v0.1.5.md
+// -> v0.1.5); if that call fails the notes still show, just undated.
+// ponytail: one releases page (100); past that the oldest lose their dates, paginate then.
+async function fetchReleaseDir(p) {
+  const [list, rels] = await Promise.all([
+    fetchText(p.url).then(JSON.parse),
+    fetchText(p.releases).then(JSON.parse, () => []),
+  ]);
+  const dates = Object.fromEntries(rels.map(r => [r.tag_name, (r.published_at || "").slice(0, 10)]));
+  const files = list.filter(f => /^v.+\.md$/.test(f.name));
+  return joinReleaseNotes(await Promise.all(files.map(async f => ({
+    ver: f.name.slice(1, -3), date: dates[f.name.slice(0, -3)], text: await fetchText(f.download_url),
+  }))));
 }
 
 async function show(id) {
@@ -388,7 +398,7 @@ async function show(id) {
   try {
     if (fresh) {
       const t0 = start("fetch"); await nextFrame();
-      cache[id] = p.type === "releasedir" ? await fetchReleaseDir(p.url) : await fetchText(p.url);
+      cache[id] = p.type === "releasedir" ? await fetchReleaseDir(p) : await fetchText(p.url);
       done("fetch", t0);
     }
 
