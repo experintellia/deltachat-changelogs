@@ -172,6 +172,10 @@ const FORKS = [
     logo:"https://raw.githubusercontent.com/muhnschein/piirit/main/icons/harbour-piirit.svg",
     repo:"https://github.com/muhnschein/piirit",
     url:"https://raw.githubusercontent.com/muhnschein/piirit/main/CHANGELOG.md" },
+  { id:"parla-haiku", label:"Parla · Haiku", type:"releasedir",
+    logo:"https://raw.githubusercontent.com/trufae/parla/main/parla.svg",
+    repo:"https://github.com/trufae/parla-haiku",
+    url:"https://api.github.com/repos/trufae/parla-haiku/contents/docs/releases" },
   // ponytail: Slothful runs this same viewer itself, so just link out instead of embedding it.
   { label:"Slothful · Web ↗",
     logo:"https://raw.githubusercontent.com/experintellia/slothfulchat-web/main/packages/web-app/static/images/icon-256.png",
@@ -281,9 +285,10 @@ function currentId() {
 
 // A) extract version + date from a heading, whatever the source format.
 // Date may be full (2026-06-23) or year-month only (2026-06, android/ios).
+// Version may carry a build suffix ("0.1.0-2", parla-haiku's repair release).
 const DATE_RE = /\d{4}-\d{2}(?:-\d{2})?/;
 function parseHeading(text) {
-  const ver = (text.match(/\d+\.\d+(?:\.\d+)?/) || [])[0] || text.trim();
+  const ver = (text.match(/\d+\.\d+(?:\.\d+)?(?:-\d+(?!\d*-))?/) || [])[0] || text.trim();
   const date = (text.match(DATE_RE) || [])[0] || null;
   return { ver, date, raw: text.trim() };
 }
@@ -338,6 +343,19 @@ function renderLoader(p, stages) {
     `<span class="ms">${s.ms != null ? s.ms + " ms" : ""}</span></div>`).join("");
 }
 
+async function fetchText(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.text();
+}
+// One notes file per release: list the folder via the GitHub contents API (unauthenticated,
+// 60 req/h per IP; once per page load thanks to cache), fetch every v*.md, join newest first.
+async function fetchReleaseDir(api) {
+  const files = JSON.parse(await fetchText(api)).filter(f => /^v.+\.md$/.test(f.name));
+  return joinReleaseNotes(await Promise.all(files.map(async f =>
+    ({ ver: f.name.slice(1, -3), text: await fetchText(f.download_url) }))));
+}
+
 async function show(id) {
   const p = byId(id);
   curId = id;
@@ -367,9 +385,7 @@ async function show(id) {
   try {
     if (fresh) {
       const t0 = start("fetch"); await nextFrame();
-      const res = await fetch(p.url);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      cache[id] = await res.text();
+      cache[id] = p.type === "releasedir" ? await fetchReleaseDir(p.url) : await fetchText(p.url);
       done("fetch", t0);
     }
 

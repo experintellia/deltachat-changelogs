@@ -23,10 +23,20 @@ function appdataToMarkdown(xml) {
   }).join("\n\n");
 }
 
+// Parla for Haiku keeps one notes file per release (docs/releases/v0.1.5.md), no dates.
+// notes: [{ver, text}] -> newest first, each under "## <ver>". A file's own "# title"
+// is dropped and its headings pushed down a level so they don't become versions.
+function joinReleaseNotes(notes) {
+  return [...notes]
+    .sort((a, b) => b.ver.localeCompare(a.ver, undefined, { numeric: true }))
+    .map(n => `## ${n.ver}\n\n` + n.text.replace(/^# .*\n/, "").replace(/^(#+ )/gm, "#$1"))
+    .join("\n\n");
+}
+
 function toMarkdown(type, text) {
   if (type === "text") return textToMarkdown(text);
   if (type === "appdata") return appdataToMarkdown(text);
   return text; // already markdown
 }
 
-if (typeof module !== "undefined") module.exports = { textToMarkdown, toMarkdown };
+if (typeof module !== "undefined") module.exports = { textToMarkdown, joinReleaseNotes, toMarkdown };
