@@ -159,15 +159,17 @@ const PROJECTS = [
 ];
 
 // Forks live on a separate view. Arcane's android app keeps no own changelog beyond the
-// upstream copy it tracks (CHANGELOG-upstream.md); its core fork has its own CHANGELOG.md.
+// upstream copy it tracks (CHANGELOG-upstream.md).
 const ARCANE_DONATE = "https://arcanechat.me/#contribute";
 const FORKS = [
   { id:"arcane-android", label:"Arcane · Android", type:"md", logo:"https://github.com/ArcaneChat.png",
     site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/android", donate:ARCANE_DONATE,
     url:"https://raw.githubusercontent.com/ArcaneChat/android/main/CHANGELOG-upstream.md" },
-  { id:"arcane-core", label:"Arcane · Core", type:"md", logo:"https://github.com/ArcaneChat.png",
-    site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/core", donate:ARCANE_DONATE,
-    url:"https://raw.githubusercontent.com/ArcaneChat/core/main/CHANGELOG.md" },
+  // Hidden for now: its CHANGELOG.md is just upstream core's, adb doesn't log the fork's own
+  // changes there. Re-enable once it does.
+  // { id:"arcane-core", label:"Arcane · Core", type:"md", logo:"https://github.com/ArcaneChat.png",
+  //   site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/core", donate:ARCANE_DONATE,
+  //   url:"https://raw.githubusercontent.com/ArcaneChat/core/main/CHANGELOG.md" },
   { id:"piirit", label:"Piirit · SailfishOS", type:"md",
     logo:"https://raw.githubusercontent.com/muhnschein/piirit/main/icons/harbour-piirit.svg",
     repo:"https://github.com/muhnschein/piirit",
