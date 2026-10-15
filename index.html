@@ -145,10 +145,6 @@ const PROJECTS = [
     logo:"https://codeberg.org/lk108/deltatouch/raw/branch/main/assets/deltatouch.svg",
     repo:"https://codeberg.org/lk108/deltatouch",
     url:"https://codeberg.org/api/v1/repos/lk108/deltatouch/media/CHANGELOG" },
-  { id:"parla", label:"Parla", type:"appdata",
-    logo:"https://raw.githubusercontent.com/trufae/parla/main/parla.svg",
-    repo:"https://github.com/trufae/parla",
-    url:"https://raw.githubusercontent.com/trufae/parla/main/data/io.github.trufae.Parla.appdata.xml" },
   { sep:true }, // chatmail: core + relay
   { id:"core", label:"Core", type:"md", logo:"https://chatmail.at/assets/logos/chatmail.svg", tint:true,
     site:"https://chatmail.at", repo:"https://github.com/deltachat/deltachat-core-rust", donate:CHATMAIL_DONATE,
@@ -159,15 +155,33 @@ const PROJECTS = [
 ];
 
 // Forks live on a separate view. Arcane's android app keeps no own changelog beyond the
-// upstream copy it tracks (CHANGELOG-upstream.md); its core fork has its own CHANGELOG.md.
+// upstream copy it tracks (CHANGELOG-upstream.md).
 const ARCANE_DONATE = "https://arcanechat.me/#contribute";
 const FORKS = [
   { id:"arcane-android", label:"Arcane · Android", type:"md", logo:"https://github.com/ArcaneChat.png",
     site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/android", donate:ARCANE_DONATE,
     url:"https://raw.githubusercontent.com/ArcaneChat/android/main/CHANGELOG-upstream.md" },
-  { id:"arcane-core", label:"Arcane · Core", type:"md", logo:"https://github.com/ArcaneChat.png",
-    site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/core", donate:ARCANE_DONATE,
-    url:"https://raw.githubusercontent.com/ArcaneChat/core/main/CHANGELOG.md" },
+  // Hidden for now: its CHANGELOG.md is just upstream core's, adb doesn't log the fork's own
+  // changes there. Re-enable once it does.
+  // { id:"arcane-core", label:"Arcane · Core", type:"md", logo:"https://github.com/ArcaneChat.png",
+  //   site:"https://arcanechat.me", repo:"https://github.com/ArcaneChat/core", donate:ARCANE_DONATE,
+  //   url:"https://raw.githubusercontent.com/ArcaneChat/core/main/CHANGELOG.md" },
+  { id:"piirit", label:"Piirit · SailfishOS", type:"md",
+    logo:"https://raw.githubusercontent.com/muhnschein/piirit/main/icons/harbour-piirit.svg",
+    repo:"https://github.com/muhnschein/piirit",
+    url:"https://raw.githubusercontent.com/muhnschein/piirit/main/CHANGELOG.md" },
+  { id:"parla", label:"Parla", type:"appdata",
+    logo:"https://raw.githubusercontent.com/trufae/parla/main/parla.svg",
+    repo:"https://github.com/trufae/parla",
+    url:"https://raw.githubusercontent.com/trufae/parla/main/data/io.github.trufae.Parla.appdata.xml" },
+  { id:"parla-haiku", label:"Parla · Haiku", type:"releasedir",
+    logo:"https://raw.githubusercontent.com/trufae/parla/main/parla.svg",
+    repo:"https://github.com/trufae/parla-haiku",
+    url:"https://api.github.com/repos/trufae/parla-haiku/contents/docs/releases" },
+  // ponytail: Slothful runs this same viewer itself, so just link out instead of embedding it.
+  { label:"Slothful · Web ↗",
+    logo:"https://raw.githubusercontent.com/experintellia/slothfulchat-web/main/packages/web-app/static/images/icon-256.png",
+    link:"https://web.slothful.chat/changelog/?p=web-app" },
 ];
 
 const byId = id => [...PROJECTS, ...FORKS].find(p => p.id === id);
@@ -206,6 +220,11 @@ function go(id) { // normal in-page navigation to a tab
 }
 function mkTab(p) {
   const a = document.createElement("a");
+  if (p.link) { // external tab: plain link, opens in a new tab
+    a.className = "tab"; a.href = p.link; a.target = "_blank"; a.rel = "noopener";
+    a.innerHTML = `<img alt="" src="${p.logo}" onerror="this.remove()"><span>${p.label}</span>`;
+    return a;
+  }
   a.className = "tab"; a.id = "tab-" + p.id; a.href = "?p=" + p.id;
   a.innerHTML = `<img alt="" class="${p.tint ? "tint" : ""}" src="${p.logo}" onerror="this.remove()"><span>${p.label}</span>`;
   a.onclick = go(p.id);
@@ -327,6 +346,19 @@ function renderLoader(p, stages) {
     `<span class="ms">${s.ms != null ? s.ms + " ms" : ""}</span></div>`).join("");
 }
 
+async function fetchText(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.text();
+}
+// One notes file per release: list the folder via the GitHub contents API (unauthenticated,
+// 60 req/h per IP; once per page load thanks to cache), fetch every v*.md, join newest first.
+async function fetchReleaseDir(api) {
+  const files = JSON.parse(await fetchText(api)).filter(f => /^v.+\.md$/.test(f.name));
+  return joinReleaseNotes(await Promise.all(files.map(async f =>
+    ({ ver: f.name.slice(1, -3), text: await fetchText(f.download_url) }))));
+}
+
 async function show(id) {
   const p = byId(id);
   curId = id;
@@ -356,9 +388,7 @@ async function show(id) {
   try {
     if (fresh) {
       const t0 = start("fetch"); await nextFrame();
-      const res = await fetch(p.url);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      cache[id] = await res.text();
+      cache[id] = p.type === "releasedir" ? await fetchReleaseDir(p.url) : await fetchText(p.url);
       done("fetch", t0);
     }
 
