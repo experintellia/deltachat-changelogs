@@ -269,8 +269,10 @@ function currentId() {
 // A) extract version + date from a heading, whatever the source format.
 // Date may be full (2026-06-23) or year-month only (2026-06, android/ios).
 const DATE_RE = /\d{4}-\d{2}(?:-\d{2})?/;
+// Keeps a pre-release suffix (1.0.0-beta.23, 1.13.0-rc4) so those get distinct, stable anchors.
+const VER_RE = /\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?/;
 function parseHeading(text) {
-  const ver = (text.match(/\d+\.\d+(?:\.\d+)?/) || [])[0] || text.trim();
+  const ver = (text.match(VER_RE) || [])[0] || text.trim();
   const date = (text.match(DATE_RE) || [])[0] || null;
   return { ver, date, raw: text.trim() };
 }
@@ -302,7 +304,7 @@ function renderLinkbar(p) {
 
 // Group each version (h2 → next h2) into a <section> so content-visibility can skip
 // off-screen ones. Nodes before the first h2 stay at top level. The h2 keeps its id,
-// so scroll-spy and #v-i scroll targets are unaffected.
+// so scroll-spy and #v-<ver> scroll targets are unaffected.
 function wrapSections() {
   let sec = null;
   for (const n of [...contentEl.childNodes]) {
@@ -370,14 +372,22 @@ async function show(id) {
     done("render", t0);
 
     t0 = performance.now();
+    // Anchors come from the version, not the position: changelogs are fetched live, so a new
+    // upstream release would shift every positional id and break shared links. Dots are kept
+    // (#v-1.58.0), so look ids up with getElementById — as a CSS selector that's invalid.
+    // ponytail: ids are ASCII, so the hash is used undecoded (decodeURIComponent throws on a stray %).
+    const taken = new Set();
     entries = [...contentEl.querySelectorAll("h2")].map((h, i) => {
-      h.id = "v-" + i;
       const e = parseHeading(h.textContent);
+      let id = new RegExp("^" + VER_RE.source + "$").test(e.ver) ? "v-" + e.ver : "v-i" + i;
+      while (taken.has(id)) id += "-" + i; // repeats / unparsed headings keep a positional id
+      taken.add(id);
+      h.id = id;
       if (!e.date) { // android/ios: date sits in the paragraph right below the heading
         const m = (h.nextElementSibling?.textContent.trim() || "").match(new RegExp("^" + DATE_RE.source));
         if (m) e.date = m[0];
       }
-      return { i, ...e };
+      return { i, id, ...e };
     });
     wrapSections(); // must run after the date-from-next-sibling read above
     ms.index = Math.round(performance.now() - t0);
@@ -395,7 +405,7 @@ async function show(id) {
       order.filter(([k]) => ms[k] != null).map(([k, l]) => `${l} ${ms[k]} ms`).join(" · ");
     contentEl.appendChild(foot);
 
-    if (location.hash) { const t = contentEl.querySelector(location.hash); if (t) t.scrollIntoView(); }
+    if (location.hash) { const t = document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView(); }
     else mainEl.scrollTop = 0; // new project starts at top → header re-expands on mobile
   } catch (e) {
     contentEl.className = "status err";
@@ -417,15 +427,15 @@ function renderSidebar() {
       tocEl.appendChild(h);
     }
     const a = document.createElement("a");
-    a.href = `?p=${curId}#v-${en.i}`;
-    a.dataset.id = "v-" + en.i;
+    a.href = `?p=${curId}#${en.id}`;
+    a.dataset.id = en.id;
     a.onclick = e => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let browser open new tab/window
       e.preventDefault();
       // Update the URL without setting location.hash — a real fragment nav flips :target and
       // forces a full-document style recalc (~250ms on large changelogs). pushState skips that.
       history.pushState({}, "", a.getAttribute("href"));
-      contentEl.querySelector("#v-" + en.i)?.scrollIntoView();
+      document.getElementById(en.id)?.scrollIntoView();
       document.body.classList.remove("drawer-open"); // close the mobile drawer on select
     };
     a.innerHTML = `<span class="ver"></span>` + (en.date ? `<span class="date"></span>` : "");
