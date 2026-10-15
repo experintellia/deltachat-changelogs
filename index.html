@@ -269,8 +269,10 @@ function currentId() {
 // A) extract version + date from a heading, whatever the source format.
 // Date may be full (2026-06-23) or year-month only (2026-06, android/ios).
 const DATE_RE = /\d{4}-\d{2}(?:-\d{2})?/;
+// Keeps a pre-release suffix (1.0.0-beta.23, 1.13.0-rc4) so those get distinct, stable anchors.
+const VER_RE = /\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?/;
 function parseHeading(text) {
-  const ver = (text.match(/\d+\.\d+(?:\.\d+)?/) || [])[0] || text.trim();
+  const ver = (text.match(VER_RE) || [])[0] || text.trim();
   const date = (text.match(DATE_RE) || [])[0] || null;
   return { ver, date, raw: text.trim() };
 }
@@ -373,10 +375,11 @@ async function show(id) {
     // Anchors come from the version, not the position: changelogs are fetched live, so a new
     // upstream release would shift every positional id and break shared links. Dots are kept
     // (#v-1.58.0), so look ids up with getElementById — as a CSS selector that's invalid.
+    // ponytail: ids are ASCII, so the hash is used undecoded (decodeURIComponent throws on a stray %).
     const taken = new Set();
     entries = [...contentEl.querySelectorAll("h2")].map((h, i) => {
       const e = parseHeading(h.textContent);
-      let id = /^\d+\.\d+(?:\.\d+)?$/.test(e.ver) ? "v-" + e.ver : "v-i" + i;
+      let id = new RegExp("^" + VER_RE.source + "$").test(e.ver) ? "v-" + e.ver : "v-i" + i;
       while (taken.has(id)) id += "-" + i; // repeats / unparsed headings keep a positional id
       taken.add(id);
       h.id = id;
@@ -402,7 +405,7 @@ async function show(id) {
       order.filter(([k]) => ms[k] != null).map(([k, l]) => `${l} ${ms[k]} ms`).join(" · ");
     contentEl.appendChild(foot);
 
-    if (location.hash) { const t = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (t) t.scrollIntoView(); }
+    if (location.hash) { const t = document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView(); }
     else mainEl.scrollTop = 0; // new project starts at top → header re-expands on mobile
   } catch (e) {
     contentEl.className = "status err";
